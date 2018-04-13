@@ -33,13 +33,15 @@ app.post('/compare', async (req, res) => {
     const image = req.files.image;
     const id = req.body.id; // the key of the
     const branch = req.body.branch; // jira ticket id
-    const fileDestination = `./screenshots/${id}/${branch}/${image.name}`;
 
-    const baseline = fs.readFileSync(`./screenshots/${id}/baseline/${image.name}`);
-    if (!fs.existsSync(fileDestination)) {
+    const baselineDestination = `./screenshots/${id}/baseline/${image.name}`;
+    if (!fs.existsSync(baselineDestination)) {
         return res.send('Baseline file does not exist');
     }
 
+    const baseline = fs.readFileSync(`./screenshots/${id}/baseline/${image.name}`);
+
+    const fileDestination = `./screenshots/${id}/${branch}/${image.name}`;
     checkAndAddPath(fileDestination);
 
     image.mv(fileDestination, (error) => {
