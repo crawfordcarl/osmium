@@ -33,17 +33,26 @@ app.post('/compare', async (req, res) => {
     const image = req.files.image;
     const id = req.body.id; // the key of the
     const branch = req.body.branch; // jira ticket id
+    const tolerance = req.body.tolerance || 0.01;
 
-    const baselineDestination = `./screenshots/${id}/baseline/${image.name}`;
-    if (!fs.existsSync(baselineDestination)) {
+    const baseDir = `./screenshots/${id}`;
+
+    const baselineImage = `${baseDir}/baseline/${image.name}`;
+    if (!fs.existsSync(baselineImage)) {
         return res.send('Baseline file does not exist');
     }
 
-    const baseline = fs.readFileSync(`./screenshots/${id}/baseline/${image.name}`);
+    // take a copy of the baseline file so that diff/fail has the right context later
+    const baselineCopyDestination = `${baseDir}/${branch}/baseline/${image.name}`;
+    checkAndAddPath(baselineCopyDestination);
+    fs.copyFileSync(baselineImage, baselineCopyDestination);
 
-    const fileDestination = `./screenshots/${id}/${branch}/${image.name}`;
+    const baseline = fs.readFileSync(baselineCopyDestination);
+
+    const fileDestination = `./screenshots/${id}/${branch}/results/${image.name}`;
     checkAndAddPath(fileDestination);
 
+    // keep a copy of the screenshot as is
     image.mv(fileDestination, (error) => {
         if (error) {
             console.error(error);
@@ -52,9 +61,11 @@ app.post('/compare', async (req, res) => {
 
     const data = await compareImages(baseline, image.data);
 
-    const suffix = fileDestination.substring(fileDestination.lastIndexOf('.'));
-    const diffDestination = fileDestination.replace(suffix, `.diff${suffix}`);
-    await fs.writeFile(diffDestination, data.getBuffer());
+    if (data.misMatchPercentage > tolerance) {
+        const suffix = fileDestination.substring(fileDestination.lastIndexOf('.'));
+        const diffDestination = fileDestination.replace(suffix, `.diff${suffix}`);
+        await fs.writeFile(diffDestination, data.getBuffer());
+    }
 
     return res.send(data);
 });
